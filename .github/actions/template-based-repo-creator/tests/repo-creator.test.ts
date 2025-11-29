@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from "vitest";
 
 vi.mock("@actions/core", () => {
   return {
@@ -18,20 +26,24 @@ vi.mock("@actions/github", () => {
 
 import * as core from "@actions/core";
 import * as github from "@actions/github";
-import { createTemplateBasedRepository } from "../repo-creator.js";
+import {
+  createTemplateBasedRepository,
+  type CreateRepoParams,
+} from "../repo-creator.js";
 
 // Mock console.log to test logging
 const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
 describe("Create Repo From Template Action", () => {
-  let mockRequest;
-  let defaultParams;
+  let mockRequest: Mock;
+  let defaultParams: CreateRepoParams;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockRequest = vi.fn();
-    github.getOctokit.mockReturnValue({
+    (github.getOctokit as Mock).mockReturnValue({
       request: mockRequest,
     });
 
@@ -47,6 +59,7 @@ describe("Create Repo From Template Action", () => {
 
   afterEach(() => {
     consoleLogSpy.mockClear();
+    consoleErrorSpy.mockClear();
   });
 
   describe("Successful repository creation", () => {
@@ -91,7 +104,7 @@ describe("Create Repo From Template Action", () => {
     });
 
     it("creates a public repository when private is set to false", async () => {
-      const params = { ...defaultParams, isPrivate: false };
+      const params: CreateRepoParams = { ...defaultParams, isPrivate: false };
       mockRequest.mockResolvedValue({
         data: { html_url: "https://github.com/my-org/public-repo" },
       });
@@ -107,7 +120,10 @@ describe("Create Repo From Template Action", () => {
     });
 
     it("creates a public repository when private input is not provided", async () => {
-      const params = { ...defaultParams, isPrivate: undefined };
+      const params: CreateRepoParams = {
+        ...defaultParams,
+        isPrivate: undefined as any,
+      };
       mockRequest.mockResolvedValue({
         data: { html_url: "https://github.com/my-org/public-repo" },
       });
@@ -123,7 +139,7 @@ describe("Create Repo From Template Action", () => {
     });
 
     it("generates correct description with template information", async () => {
-      const params = {
+      const params: CreateRepoParams = {
         ...defaultParams,
         templateOwner: "awesome-org",
         templateRepo: "awesome-template",
@@ -170,6 +186,7 @@ describe("Create Repo From Template Action", () => {
       expect(core.setFailed).toHaveBeenCalledWith("API request failed");
       expect(core.setFailed).toHaveBeenCalledTimes(1);
       expect(core.setOutput).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalled();
     });
 
     it("handles authentication errors", async () => {
@@ -246,7 +263,7 @@ describe("Create Repo From Template Action", () => {
     });
 
     it("handles isPrivate as true", async () => {
-      const params = { ...defaultParams, isPrivate: true };
+      const params: CreateRepoParams = { ...defaultParams, isPrivate: true };
       mockRequest.mockResolvedValue({
         data: { html_url: "https://github.com/my-org/generated-repo" },
       });
@@ -259,7 +276,7 @@ describe("Create Repo From Template Action", () => {
     });
 
     it("handles isPrivate as false", async () => {
-      const params = { ...defaultParams, isPrivate: false };
+      const params: CreateRepoParams = { ...defaultParams, isPrivate: false };
       mockRequest.mockResolvedValue({
         data: {
           html_url: `https://github.com/${params.newRepoOwner}/${params.newRepoName}`,

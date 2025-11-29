@@ -1,7 +1,7 @@
 import * as core from "@actions/core";
 import { createTemplateBasedRepository } from "./repo-creator.js";
 
-async function main() {
+async function main(): Promise<void> {
   const token = core.getInput("token", { required: true });
   const templateOwner = core.getInput("template_owner", { required: true });
   const templateRepo = core.getInput("template_repo", { required: true });

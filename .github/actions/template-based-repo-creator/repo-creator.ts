@@ -1,14 +1,29 @@
 import * as github from "@actions/github";
 import * as core from "@actions/core";
 
-export async function run({
-  token,
-  templateOwner,
-  templateRepo,
-  newRepoOwner,
-  newRepoName,
-  isPrivate,
-}) {
+export interface CreateRepoParams {
+  token: string;
+  templateOwner: string;
+  templateRepo: string;
+  newRepoOwner: string;
+  newRepoName: string;
+  isPrivate: boolean;
+}
+
+export interface CreateRepoResult {
+  repository_url: string;
+}
+
+export async function run(params: CreateRepoParams): Promise<CreateRepoResult> {
+  const {
+    token,
+    templateOwner,
+    templateRepo,
+    newRepoOwner,
+    newRepoName,
+    isPrivate,
+  } = params;
+
   const octokit = github.getOctokit(token);
 
   const response = await octokit.request(
@@ -33,28 +48,24 @@ export async function run({
   };
 }
 
-export async function createTemplateBasedRepository({
-  token,
-  templateOwner,
-  templateRepo,
-  newRepoOwner,
-  newRepoName,
-  isPrivate,
-}) {
+export async function createTemplateBasedRepository(
+  params: CreateRepoParams
+): Promise<void> {
   try {
-    const { repository_url } = await run({
-      token,
-      templateOwner,
-      templateRepo,
-      newRepoOwner,
-      newRepoName,
-      isPrivate,
-    });
+    const { repository_url } = await run(params);
     core.setOutput("repository_url", repository_url);
 
     console.log(`Repository created: ${repository_url}`);
   } catch (error) {
-    core.setFailed(error.message);
+    let message: string;
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (typeof error === "string") {
+      message = error;
+    } else {
+      message = String(error);
+    }
+    core.setFailed(message);
     console.error(error);
   }
 }
