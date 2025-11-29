@@ -29,8 +29,6 @@ export async function run(params: CreateRepoParams): Promise<CreateRepoResult> {
   const response = await octokit.request(
     `POST /repos/${templateOwner}/${templateRepo}/generate`,
     {
-      template_owner: templateOwner,
-      template_repo: templateRepo,
       owner: newRepoOwner,
       name: newRepoName,
       private: isPrivate,
