@@ -1,0 +1,31 @@
+name: "Create Repository From Template"
+description: "Creates a new GitHub repository from a template repository."
+author: "Your Name"
+inputs:
+  token:
+    description: "GitHub token with repo creation rights"
+    required: true
+  template_owner:
+    required: true
+    description: "Owner of the template repository"
+  template_repo:
+    required: true
+    description: "Name of the template repository"
+  new_repo_owner:
+    required: true
+    description: "Owner of the new repository"
+  new_repo_name:
+    required: true
+    description: "Name of the new repository"
+  private:
+    required: false
+    default: true
+    description: "Whether the created repository will be private"
+
+outputs:
+  repository_url:
+    description: "URL of the created repository"
+
+runs:
+  using: "node20"
+  main: "index.js"
