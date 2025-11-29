@@ -4,5 +4,5 @@ node_modules
 
 # Keep only the bundled action in dist
 dist/*
-!dist/index.js
+!dist/index.cjs
 
