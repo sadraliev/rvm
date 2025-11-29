@@ -1,5 +1,8 @@
 import * as core from "@actions/core";
-import { createTemplateBasedRepository } from "./repo-creator.js";
+import {
+  createTemplateBasedRepository,
+  protectDefaultBranch,
+} from "./repo-creator.js";
 
 async function main(): Promise<void> {
   const token = core.getInput("token", { required: true });
@@ -8,8 +11,10 @@ async function main(): Promise<void> {
   const newRepoOwner = core.getInput("new_repo_owner", { required: true });
   const newRepoName = core.getInput("new_repo_name", { required: true });
   const isPrivate = core.getInput("private") === "true";
+  const shouldProtectDefaultBranch =
+    core.getInput("protect_default_branch") === "true";
 
-  await createTemplateBasedRepository({
+  const { default_branch_name } = await createTemplateBasedRepository({
     token,
     templateOwner,
     templateRepo,
@@ -17,6 +22,14 @@ async function main(): Promise<void> {
     newRepoName,
     isPrivate,
   });
+  if (shouldProtectDefaultBranch) {
+    await protectDefaultBranch({
+      token,
+      owner: newRepoOwner,
+      repo: newRepoName,
+      branch: default_branch_name,
+    });
+  }
 }
 
 main();

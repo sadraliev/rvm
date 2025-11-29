@@ -10,10 +10,10 @@ export interface CreateRepoParams {
   isPrivate: boolean;
 }
 
-export interface CreateRepoResult {
+export type CreateRepoResult = {
   repository_url: string;
   default_branch_name: string;
-}
+};
 
 export async function run(params: CreateRepoParams): Promise<CreateRepoResult> {
   const {
@@ -46,12 +46,13 @@ export async function run(params: CreateRepoParams): Promise<CreateRepoResult> {
 
 export async function createTemplateBasedRepository(
   params: CreateRepoParams
-): Promise<void> {
+): Promise<CreateRepoResult> {
   try {
-    const { repository_url } = await run(params);
+    const { repository_url, default_branch_name } = await run(params);
     core.setOutput("repository_url", repository_url);
-
+    core.setOutput("default_branch_name", default_branch_name);
     console.log(`Repository created: ${repository_url}`);
+    return { repository_url, default_branch_name };
   } catch (error) {
     let message: string;
     if (error instanceof Error) {
@@ -63,6 +64,7 @@ export async function createTemplateBasedRepository(
     }
     core.setFailed(message);
     console.error(error);
+    return { repository_url: "", default_branch_name: "" };
   }
 }
 
@@ -90,8 +92,6 @@ export async function protectDefaultBranch({
         },
         enforce_admins: true,
         required_pull_request_reviews: {
-          dismiss_stale_reviews: true,
-          require_code_owner_reviews: false,
           required_approving_review_count: 1,
         },
         restrictions: null,
