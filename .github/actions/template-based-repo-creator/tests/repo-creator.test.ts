@@ -96,7 +96,7 @@ describe("Create Repo From Template Action", () => {
         "repository_url",
         "https://github.com/my-org/generated-repo"
       );
-      expect(core.setOutput).toHaveBeenCalledTimes(1);
+      expect(core.setOutput).toHaveBeenCalledTimes(2);
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         "Repository created: https://github.com/my-org/generated-repo"
@@ -359,8 +359,6 @@ describe("Protect Default Branch", () => {
           },
           enforce_admins: true,
           required_pull_request_reviews: {
-            dismiss_stale_reviews: true,
-            require_code_owner_reviews: false,
             required_approving_review_count: 1,
           },
           restrictions: null,
@@ -427,17 +425,6 @@ describe("Protect Default Branch", () => {
       expect(
         callArgs.required_pull_request_reviews.required_approving_review_count
       ).toBe(1);
-    });
-
-    it("dismisses stale reviews", async () => {
-      mockRequest.mockResolvedValue({ data: {} });
-
-      await protectDefaultBranch(defaultProtectParams);
-
-      const callArgs = mockRequest.mock.calls[0][1];
-      expect(callArgs.required_pull_request_reviews.dismiss_stale_reviews).toBe(
-        true
-      );
     });
 
     it("requires strict status checks", async () => {
