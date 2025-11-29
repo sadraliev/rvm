@@ -21,6 +21,10 @@ inputs:
     required: false
     default: true
     description: "Whether the created repository will be private"
+  protect_default_branch:
+    required: false
+    default: true
+    description: "Whether the default branch will be protected"
 
 outputs:
   repository_url:

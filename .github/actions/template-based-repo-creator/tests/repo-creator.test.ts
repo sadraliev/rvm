@@ -28,7 +28,9 @@ import * as core from "@actions/core";
 import * as github from "@actions/github";
 import {
   createTemplateBasedRepository,
+  protectDefaultBranch,
   type CreateRepoParams,
+  type ProtectDefaultBranchParams,
 } from "../repo-creator.js";
 
 // Mock console.log to test logging
@@ -78,8 +80,6 @@ describe("Create Repo From Template Action", () => {
       expect(mockRequest).toHaveBeenCalledWith(
         `POST /repos/${defaultParams.templateOwner}/${defaultParams.templateRepo}/generate`,
         {
-          template_owner: "template-owner",
-          template_repo: "template-repo",
           owner: "my-org",
           name: "generated-repo",
           private: true,
@@ -253,8 +253,6 @@ describe("Create Repo From Template Action", () => {
       expect(mockRequest).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          template_owner: defaultParams.templateOwner,
-          template_repo: defaultParams.templateRepo,
           owner: defaultParams.newRepoOwner,
           name: defaultParams.newRepoName,
           private: defaultParams.isPrivate,
@@ -315,6 +313,262 @@ describe("Create Repo From Template Action", () => {
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         `Repository created: ${expectedUrl}`
+      );
+    });
+  });
+});
+
+describe("Protect Default Branch", () => {
+  let mockRequest: Mock;
+  let defaultProtectParams: ProtectDefaultBranchParams;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    mockRequest = vi.fn();
+    (github.getOctokit as Mock).mockReturnValue({
+      request: mockRequest,
+    });
+
+    defaultProtectParams = {
+      token: "TEST_TOKEN",
+      owner: "test-org",
+      repo: "test-repo",
+      branch: "main",
+    };
+  });
+
+  afterEach(() => {
+    consoleLogSpy.mockClear();
+    consoleErrorSpy.mockClear();
+  });
+
+  describe("Successful branch protection", () => {
+    it("protects branch with correct parameters", async () => {
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(github.getOctokit).toHaveBeenCalledWith("TEST_TOKEN");
+      expect(mockRequest).toHaveBeenCalledWith(
+        `PUT /repos/${defaultProtectParams.owner}/${defaultProtectParams.repo}/branches/${defaultProtectParams.branch}/protection`,
+        {
+          required_status_checks: {
+            strict: true,
+            contexts: [],
+          },
+          enforce_admins: true,
+          required_pull_request_reviews: {
+            dismiss_stale_reviews: true,
+            require_code_owner_reviews: false,
+            required_approving_review_count: 1,
+          },
+          restrictions: null,
+          headers: {
+            accept: "application/vnd.github+json",
+          },
+        }
+      );
+    });
+
+    it("logs protection start message", async () => {
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith("Protecting branch main...");
+    });
+
+    it("logs protection success message", async () => {
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        "Branch main is now protected."
+      );
+    });
+
+    it("protects custom branch name", async () => {
+      const params = { ...defaultProtectParams, branch: "develop" };
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(params);
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        `PUT /repos/${params.owner}/${params.repo}/branches/${params.branch}/protection`,
+        expect.objectContaining({
+          required_status_checks: expect.any(Object),
+        })
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        "Protecting branch develop..."
+      );
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        "Branch develop is now protected."
+      );
+    });
+
+    it("enforces admins by default", async () => {
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      const callArgs = mockRequest.mock.calls[0][1];
+      expect(callArgs.enforce_admins).toBe(true);
+    });
+
+    it("requires 1 approving review", async () => {
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      const callArgs = mockRequest.mock.calls[0][1];
+      expect(
+        callArgs.required_pull_request_reviews.required_approving_review_count
+      ).toBe(1);
+    });
+
+    it("dismisses stale reviews", async () => {
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      const callArgs = mockRequest.mock.calls[0][1];
+      expect(callArgs.required_pull_request_reviews.dismiss_stale_reviews).toBe(
+        true
+      );
+    });
+
+    it("requires strict status checks", async () => {
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      const callArgs = mockRequest.mock.calls[0][1];
+      expect(callArgs.required_status_checks.strict).toBe(true);
+    });
+
+    it("sets no branch restrictions", async () => {
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      const callArgs = mockRequest.mock.calls[0][1];
+      expect(callArgs.restrictions).toBe(null);
+    });
+  });
+
+  describe("Error handling", () => {
+    it("handles API request failures", async () => {
+      mockRequest.mockRejectedValue(new Error("Branch protection failed"));
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(core.setFailed).toHaveBeenCalledWith("Branch protection failed");
+      expect(consoleErrorSpy).toHaveBeenCalled();
+    });
+
+    it("handles authentication errors", async () => {
+      mockRequest.mockRejectedValue(new Error("Bad credentials"));
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(core.setFailed).toHaveBeenCalledWith("Bad credentials");
+    });
+
+    it("handles insufficient permissions", async () => {
+      mockRequest.mockRejectedValue(
+        new Error("Resource not accessible by integration")
+      );
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(core.setFailed).toHaveBeenCalledWith(
+        "Resource not accessible by integration"
+      );
+    });
+
+    it("handles branch not found errors", async () => {
+      mockRequest.mockRejectedValue(new Error("Branch not found"));
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(core.setFailed).toHaveBeenCalledWith("Branch not found");
+    });
+
+    it("handles network errors", async () => {
+      mockRequest.mockRejectedValue(new Error("Network request failed"));
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(core.setFailed).toHaveBeenCalledWith("Network request failed");
+    });
+
+    it("logs error to console", async () => {
+      const error = new Error("Some error");
+      mockRequest.mockRejectedValue(error);
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(error);
+    });
+
+    it("handles string errors", async () => {
+      mockRequest.mockRejectedValue("String error message");
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(core.setFailed).toHaveBeenCalledWith("String error message");
+    });
+
+    it("does not log success messages on error", async () => {
+      mockRequest.mockRejectedValue(new Error("Failed"));
+
+      await protectDefaultBranch(defaultProtectParams);
+
+      expect(consoleLogSpy).toHaveBeenCalledWith("Protecting branch main...");
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(
+        "Branch main is now protected."
+      );
+    });
+  });
+
+  describe("Parameter validation", () => {
+    it("uses correct token for authentication", async () => {
+      const params = { ...defaultProtectParams, token: "CUSTOM_TOKEN" };
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(params);
+
+      expect(github.getOctokit).toHaveBeenCalledWith("CUSTOM_TOKEN");
+    });
+
+    it("works with different owner and repo", async () => {
+      const params = {
+        ...defaultProtectParams,
+        owner: "different-org",
+        repo: "different-repo",
+      };
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(params);
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        `PUT /repos/${params.owner}/${params.repo}/branches/${params.branch}/protection`,
+        expect.any(Object)
+      );
+    });
+
+    it("handles branch names with special characters", async () => {
+      const params = { ...defaultProtectParams, branch: "feature/test-123" };
+      mockRequest.mockResolvedValue({ data: {} });
+
+      await protectDefaultBranch(params);
+
+      expect(mockRequest).toHaveBeenCalledWith(
+        `PUT /repos/${params.owner}/${params.repo}/branches/${params.branch}/protection`,
+        expect.any(Object)
       );
     });
   });
