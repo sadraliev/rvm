@@ -3,6 +3,7 @@ import {
   createTemplateBasedRepository,
   protectDefaultBranch,
 } from "./repo-creator.js";
+import retrySystem from "./retry.js";
 
 async function main(): Promise<void> {
   const token = core.getInput("token", { required: true });
@@ -23,11 +24,13 @@ async function main(): Promise<void> {
     isPrivate,
   });
   if (shouldProtectDefaultBranch) {
-    await protectDefaultBranch({
-      token,
-      owner: newRepoOwner,
-      repo: newRepoName,
-      branch: default_branch_name,
+    await retrySystem.execute(async () => {
+      return protectDefaultBranch({
+        token,
+        owner: newRepoOwner,
+        repo: newRepoName,
+        branch: default_branch_name,
+      });
     });
   }
 }
