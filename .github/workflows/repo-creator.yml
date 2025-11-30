@@ -23,5 +23,5 @@ jobs:
           template_repo: "nestjs-template"
           new_repo_owner: ${{ env.ORGANIZATION_NAME }}
           new_repo_name: "backend-${{ env.PROJECT_NAME }}"
-          private: true
+          private: false
           protect_default_branch: true
