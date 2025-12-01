@@ -23,16 +23,34 @@ async function main(): Promise<void> {
     newRepoName,
     isPrivate,
   });
+
   if (shouldProtectDefaultBranch) {
-    await retrySystem.execute(async () => {
-      return protectDefaultBranch({
-        token,
-        owner: newRepoOwner,
-        repo: newRepoName,
-        branch: default_branch_name,
-      });
-    });
+    try {
+      await retrySystem.execute(
+        async () => {
+          return protectDefaultBranch({
+            token,
+            owner: newRepoOwner,
+            repo: newRepoName,
+            branch: default_branch_name,
+          });
+        },
+        {
+          action: "protect_branch",
+          branch: default_branch_name,
+          repo: `${newRepoOwner}/${newRepoName}`,
+        }
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      core.setFailed(`Failed to protect branch after retries: ${message}`);
+      throw error;
+    }
   }
 }
 
-main();
+main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  core.setFailed(message);
+  process.exit(1);
+});

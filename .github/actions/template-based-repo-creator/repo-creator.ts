@@ -74,44 +74,64 @@ export type ProtectDefaultBranchParams = {
   repo: string;
   token: string;
 };
+
+async function checkBranchExists(
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string
+): Promise<boolean> {
+  try {
+    await getOctokit(token).request(
+      `GET /repos/${owner}/${repo}/branches/${branch}`,
+      {
+        headers: {
+          accept: "application/vnd.github+json",
+        },
+      }
+    );
+    return true;
+  } catch (error: any) {
+    if (error?.status === 404) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 export async function protectDefaultBranch({
   branch,
   owner,
   repo,
   token,
 }: ProtectDefaultBranchParams): Promise<void> {
-  try {
-    console.log(`Protecting branch ${branch}...`);
+  console.log(`Protecting branch ${branch}...`);
 
-    await getOctokit(token).request(
-      `PUT /repos/${owner}/${repo}/branches/${branch}/protection`,
-      {
-        required_status_checks: {
-          strict: true,
-          contexts: [],
-        },
-        enforce_admins: true,
-        required_pull_request_reviews: {
-          required_approving_review_count: 1,
-        },
-        restrictions: null,
-        headers: {
-          accept: "application/vnd.github+json",
-        },
-      }
+  // Check if branch exists first
+  const branchExists = await checkBranchExists(owner, repo, branch, token);
+  if (!branchExists) {
+    throw new Error(
+      `Branch ${branch} does not exist yet. It may still be initializing from the template.`
     );
-
-    console.log(`Branch ${branch} is now protected.`);
-  } catch (error) {
-    let message: string;
-    if (error instanceof Error) {
-      message = error.message;
-    } else if (typeof error === "string") {
-      message = error;
-    } else {
-      message = String(error);
-    }
-    core.setFailed(message);
-    console.error(error);
   }
+
+  await getOctokit(token).request(
+    `PUT /repos/${owner}/${repo}/branches/${branch}/protection`,
+    {
+      required_status_checks: {
+        strict: true,
+        contexts: [],
+      },
+      enforce_admins: true,
+      required_pull_request_reviews: {
+        required_approving_review_count: 1,
+      },
+      restrictions: null,
+      headers: {
+        accept: "application/vnd.github+json",
+      },
+    }
+  );
+
+  console.log(`Branch ${branch} is now protected.`);
 }

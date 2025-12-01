@@ -200,12 +200,12 @@ const createRetryMechanism = (options: RetryMechanismOptions = {}) => {
 
 const retrySystem = createRetryMechanism({
   retry: {
-    baseDelay: 1000,
+    baseDelay: 3000, // Start with 2 seconds to give GitHub time to initialize
     maxDelay: 30000,
-    maxRetries: 5,
+    maxRetries: 8, // More retries for branch initialization delays
   },
   circuitBreaker: {
-    failureThreshold: 5,
+    failureThreshold: 10, // Higher threshold since we expect initial failures
     resetTimeout: 60000,
   },
 });
