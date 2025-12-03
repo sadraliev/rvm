@@ -1,0 +1,278 @@
+import * as core from "@actions/core";
+import { getOctokit, context } from "@actions/github";
+
+type CommentType =
+  | "success"
+  | "failure"
+  | "deleted"
+  | "no-repo"
+  | "repo-exists";
+
+interface CommentParams {
+  repoName: string;
+  repoUrl: string;
+  template: string;
+  collaborators: string[];
+}
+
+// ============================================
+// Comment Generation
+// ============================================
+
+function generateComment(type: CommentType, params: CommentParams): string {
+  const { repoName, repoUrl, template, collaborators } = params;
+  const accountsList = collaborators.map((a) => `- @${a}`).join("\n");
+
+  switch (type) {
+    case "success":
+      return `## ✅ Repository Created Successfully!
+
+**Repository:** [${repoName}](${repoUrl})
+**Template:** \`${template}\`
+
+**Collaborators Added:**
+${accountsList || "_No collaborators specified_"}
+
+---
+
+⚠️ **Important:** Closing this issue will **delete** the repository.`;
+
+    case "failure":
+      return `## ❌ Repository Creation Failed
+
+There was an error creating your repository. Please check the workflow logs for details.
+
+You can close this issue and create a new one to try again.`;
+
+    case "deleted":
+      return `## 🗑️ Repository Deleted
+
+The repository \`${repoName}\` has been deleted because this issue was closed.
+
+If this was a mistake, you can create a new project request issue.`;
+
+    case "no-repo":
+      return `## ℹ️ Issue Closed
+
+This issue was closed but no repository name was found in the title.`;
+
+    case "repo-exists":
+      return `## ⚠️ Repository Already Exists
+
+A repository named \`${repoName}\` already exists.
+
+Please choose a different project name and create a new issue.`;
+
+    default:
+      return `Comment type "${type}" not recognized.`;
+  }
+}
+
+async function postComment(
+  octokit: ReturnType<typeof getOctokit>,
+  issueNumber: number,
+  commentType: CommentType,
+  params: CommentParams
+): Promise<void> {
+  const comment = generateComment(commentType, params);
+
+  await octokit.rest.issues.createComment({
+    owner: context.repo.owner,
+    repo: context.repo.repo,
+    issue_number: issueNumber,
+    body: comment,
+  });
+
+  console.log(`✅ Posted "${commentType}" comment on issue #${issueNumber}`);
+}
+
+// ============================================
+// Parse Issue Form
+// ============================================
+
+function parseFormField(body: string, fieldName: string): string | null {
+  const regex = new RegExp(
+    `### ${fieldName}\\s*\\n\\s*([\\s\\S]*?)(?=\\n###|$)`,
+    "i"
+  );
+  const match = body.match(regex);
+  return match ? match[1].trim() : null;
+}
+
+function parseGitHubAccounts(accountsText: string | null): string[] {
+  if (!accountsText) return [];
+  return accountsText
+    .split("\n")
+    .map((line) => line.trim().replace(/^@/, ""))
+    .filter((line) => line.length > 0);
+}
+
+function extractProjectName(title: string): string {
+  if (!title) return "";
+  const match = title.match(/\[Project\]:\s*(.+)/i);
+  return match ? match[1].trim() : "";
+}
+
+function sanitizeRepoName(projectName: string): string {
+  if (!projectName) return "";
+  return projectName
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function parseIssueForm(issueTitle: string, issueBody: string) {
+  const projectName = extractProjectName(issueTitle);
+  const template = parseFormField(issueBody, "Template Repository");
+  const githubAccountsRaw = parseFormField(issueBody, "GitHub Accounts");
+  const description = parseFormField(issueBody, "Project Description");
+  const isPrivate = issueBody.includes("[X] Make this repository private");
+  const githubAccounts = parseGitHubAccounts(githubAccountsRaw);
+  const repoName = sanitizeRepoName(projectName);
+
+  return {
+    projectName,
+    repoName,
+    template: template || "nestjs-template",
+    githubAccounts,
+    description: description || "",
+    isPrivate,
+  };
+}
+
+// ============================================
+// Validate Inputs
+// ============================================
+
+function validateRepoName(repoName: string): string[] {
+  const errors: string[] = [];
+
+  if (!repoName || repoName.length < 1) {
+    errors.push("Project name is required");
+  }
+
+  if (repoName && repoName.length > 100) {
+    errors.push("Project name is too long (max 100 characters)");
+  }
+
+  if (repoName && !/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(repoName)) {
+    errors.push(
+      "Repository name must start and end with alphanumeric characters"
+    );
+  }
+
+  return errors;
+}
+
+// ============================================
+// Check Repository Exists
+// ============================================
+
+async function checkRepoExists(
+  octokit: ReturnType<typeof getOctokit>,
+  owner: string,
+  repo: string
+): Promise<boolean> {
+  try {
+    await octokit.rest.repos.get({ owner, repo });
+    console.log(`⚠️ Repository ${owner}/${repo} already exists`);
+    return true;
+  } catch (error: any) {
+    if (error?.status === 404) {
+      console.log(`✅ Repository ${owner}/${repo} does not exist`);
+      return false;
+    }
+    throw error;
+  }
+}
+
+// ============================================
+// Main
+// ============================================
+
+async function main(): Promise<void> {
+  const token = core.getInput("token", { required: true });
+  const action = core.getInput("action", { required: true });
+
+  const octokit = getOctokit(token);
+
+  switch (action) {
+    case "parse": {
+      const issueTitle = core.getInput("issue_title", { required: true });
+      const issueBody = core.getInput("issue_body", { required: true });
+
+      const parsed = parseIssueForm(issueTitle, issueBody);
+
+      console.log("Parsed data:");
+      console.log("- Project Name:", parsed.projectName);
+      console.log("- Repo Name:", parsed.repoName);
+      console.log("- Template:", parsed.template);
+      console.log("- Collaborators:", parsed.githubAccounts);
+      console.log("- Private:", parsed.isPrivate);
+
+      core.setOutput("project_name", parsed.projectName);
+      core.setOutput("repo_name", parsed.repoName);
+      core.setOutput("template", parsed.template);
+      core.setOutput("collaborators", JSON.stringify(parsed.githubAccounts));
+      core.setOutput("description", parsed.description);
+      core.setOutput("is_private", String(parsed.isPrivate));
+
+      // Also validate
+      const errors = validateRepoName(parsed.repoName);
+      if (errors.length > 0) {
+        core.setOutput("valid", "false");
+        core.setOutput("errors", errors.join(", "));
+        console.log("❌ Validation errors:", errors.join(", "));
+      } else {
+        core.setOutput("valid", "true");
+        core.setOutput("errors", "");
+        console.log("✅ Validation passed");
+      }
+      break;
+    }
+
+    case "check-repo": {
+      const owner = core.getInput("owner", { required: true });
+      const repoName = core.getInput("repo_name", { required: true });
+
+      const exists = await checkRepoExists(octokit, owner, repoName);
+      core.setOutput("exists", exists ? "true" : "false");
+      break;
+    }
+
+    case "comment": {
+      const issueNumber = parseInt(
+        core.getInput("issue_number", { required: true })
+      );
+      const commentType = core.getInput("comment_type") as CommentType;
+      const repoName = core.getInput("repo_name") || "";
+      const repoUrl = core.getInput("repo_url") || "";
+      const template = core.getInput("template") || "";
+      let collaborators: string[] = [];
+
+      try {
+        collaborators = JSON.parse(core.getInput("collaborators") || "[]");
+      } catch {
+        collaborators = [];
+      }
+
+      await postComment(octokit, issueNumber, commentType, {
+        repoName,
+        repoUrl,
+        template,
+        collaborators,
+      });
+      break;
+    }
+
+    default:
+      core.setFailed(`Unknown action: ${action}`);
+  }
+}
+
+main().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  core.setFailed(message);
+  process.exit(1);
+});

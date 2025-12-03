@@ -1,0 +1,67 @@
+name: "Issue Manager"
+description: "Manages GitHub issue operations: parse, validate, check-repo, comment"
+author: "RVM"
+
+inputs:
+  token:
+    description: "GitHub token"
+    required: true
+  action:
+    description: "Action to perform: parse, check-repo, comment"
+    required: true
+  # For parse action
+  issue_title:
+    description: "Issue title"
+    required: false
+  issue_body:
+    description: "Issue body"
+    required: false
+  # For check-repo action
+  owner:
+    description: "Repository owner"
+    required: false
+  repo_name:
+    description: "Repository name"
+    required: false
+  # For comment action
+  issue_number:
+    description: "Issue number"
+    required: false
+  comment_type:
+    description: "Comment type: success, failure, deleted, no-repo, repo-exists"
+    required: false
+  repo_url:
+    description: "Repository URL"
+    required: false
+  template:
+    description: "Template name"
+    required: false
+  collaborators:
+    description: "JSON array of collaborators"
+    required: false
+
+outputs:
+  # From parse action
+  project_name:
+    description: "Extracted project name"
+  repo_name:
+    description: "Sanitized repository name"
+  template:
+    description: "Template repository"
+  collaborators:
+    description: "JSON array of collaborators"
+  description:
+    description: "Project description"
+  is_private:
+    description: "Whether repo should be private"
+  valid:
+    description: "Whether inputs are valid"
+  errors:
+    description: "Validation errors if any"
+  # From check-repo action
+  exists:
+    description: "Whether repository exists"
+
+runs:
+  using: "node20"
+  main: "dist/index.cjs"
