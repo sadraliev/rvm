@@ -2,7 +2,7 @@ name: Repository Lifecycle Manager
 
 on:
   issues:
-    types: [opened, closed, labeled]
+    types: [opened, closed]
 
 env:
   GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
@@ -13,9 +13,7 @@ jobs:
   # JOB: Create repository when issue is opened
   # ===========================================
   create-repository:
-    if: |
-      github.event.action == 'opened' &&
-      contains(github.event.issue.labels.*.name, 'project-request')
+    if: github.event.action == 'opened'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -52,7 +50,6 @@ jobs:
           protect_default_branch: true
 
       - name: Add Collaborators
-        if: success()
         env:
           GITHUB_TOKEN: ${{ env.GH_ADMIN_TOKEN }}
           REPO_OWNER: ${{ env.ORGANIZATION_NAME }}
@@ -61,7 +58,6 @@ jobs:
         run: node scripts/actions/add-collaborators.js
 
       - name: Add Label to Track Repository
-        if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -69,7 +65,6 @@ jobs:
         run: node scripts/actions/add-repo-label.js
 
       - name: Comment Success on Issue
-        if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -89,16 +84,11 @@ jobs:
           COMMENT_TYPE: failure
         run: node scripts/actions/comment-on-issue.js
 
-  # ================================================================
-  # JOB: Delete repository when issue is closed or labeled "closed"
-  # ================================================================
+  # ===========================================
+  # JOB: Delete repository when issue is closed
+  # ===========================================
   delete-repository:
-    if: |
-      contains(github.event.issue.labels.*.name, 'project-request') &&
-      (
-        github.event.action == 'closed' ||
-        (github.event.action == 'labeled' && github.event.label.name == 'closed')
-      )
+    if: github.event.action == 'closed'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
