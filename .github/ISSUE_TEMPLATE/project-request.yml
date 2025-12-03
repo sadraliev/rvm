@@ -1,7 +1,6 @@
 name: Project Request
 description: Submit a new project with team members
-title: "[Project]: "
-labels: ["project-request"]
+
 body:
   - type: markdown
     attributes:
@@ -42,7 +41,7 @@ body:
         hubot
         monalisa
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: description
