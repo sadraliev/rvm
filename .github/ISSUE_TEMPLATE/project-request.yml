@@ -1,22 +1,15 @@
 name: Project Request
 description: Submit a new project with team members
-
+title: "[Project]: "
+labels: ["project-request"]
 body:
   - type: markdown
     attributes:
       value: |
         ## New Project Request
-        Please fill out the form below to submit your project request.
-        A new repository will be created from the selected template.
+        Fill out the form below to create a new repository.
 
-  - type: input
-    id: project-name
-    attributes:
-      label: Project Name
-      description: Enter the name of your project (will be used as repository name)
-      placeholder: "my-awesome-project"
-    validations:
-      required: true
+        **Enter your project name in the title above** (after `[Project]: `)
 
   - type: dropdown
     id: template

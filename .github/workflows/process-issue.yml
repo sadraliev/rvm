@@ -29,6 +29,7 @@ jobs:
       - name: Parse Issue Form
         id: parse
         env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: node scripts/actions/parse-issue-form.js
