@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - .github/actions/template-based-repo-creator/**
 env:
   GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
   ORGANIZATION_NAME: sadraliev
