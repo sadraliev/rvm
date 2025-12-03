@@ -1,0 +1,62 @@
+name: Project Request
+description: Submit a new project with team members
+title: "[Project]: "
+labels: ["project-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## New Project Request
+        Please fill out the form below to submit your project request.
+        A new repository will be created from the selected template.
+
+  - type: input
+    id: project-name
+    attributes:
+      label: Project Name
+      description: Enter the name of your project (will be used as repository name)
+      placeholder: "my-awesome-project"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: template
+    attributes:
+      label: Template Repository
+      description: Select the template to use for your project
+      options:
+        - nestjs-template
+        - react-template
+        - nextjs-template
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: github-accounts
+    attributes:
+      label: GitHub Accounts
+      description: List the GitHub usernames of team members (one per line) - they will be added as collaborators
+      placeholder: |
+        octocat
+        hubot
+        monalisa
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Project Description
+      description: Brief description of the project (optional)
+      placeholder: "Describe what this project is about..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: private-repo
+    attributes:
+      label: Repository Visibility
+      options:
+        - label: Make this repository private
+          required: false
