@@ -1,0 +1,147 @@
+name: Repository Lifecycle Manager
+
+on:
+  issues:
+    types: [opened, closed, labeled]
+
+env:
+  GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
+  ORGANIZATION_NAME: sadraliev
+
+jobs:
+  # ===========================================
+  # JOB: Create repository when issue is opened
+  # ===========================================
+  create-repository:
+    if: |
+      github.event.action == 'opened' &&
+      contains(github.event.issue.labels.*.name, 'project-request')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Parse Issue Form
+        id: parse
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: node scripts/actions/parse-issue-form.js
+
+      - name: Validate Inputs
+        env:
+          REPO_NAME: ${{ steps.parse.outputs.repo_name }}
+        run: node scripts/actions/validate-inputs.js
+
+      - name: Create Repository from Template
+        id: create
+        uses: ./.github/actions/template-based-repo-creator
+        with:
+          token: ${{ env.GH_ADMIN_TOKEN }}
+          template_owner: ${{ env.ORGANIZATION_NAME }}
+          template_repo: ${{ steps.parse.outputs.template }}
+          new_repo_owner: ${{ env.ORGANIZATION_NAME }}
+          new_repo_name: ${{ steps.parse.outputs.repo_name }}
+          private: ${{ steps.parse.outputs.is_private }}
+          protect_default_branch: true
+
+      - name: Add Collaborators
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ env.GH_ADMIN_TOKEN }}
+          REPO_OWNER: ${{ env.ORGANIZATION_NAME }}
+          REPO_NAME: ${{ steps.parse.outputs.repo_name }}
+          GITHUB_ACCOUNTS: ${{ steps.parse.outputs.github_accounts }}
+        run: node scripts/actions/add-collaborators.js
+
+      - name: Add Label to Track Repository
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO_NAME: ${{ steps.parse.outputs.repo_name }}
+        run: node scripts/actions/add-repo-label.js
+
+      - name: Comment Success on Issue
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_TYPE: success
+          PROJECT_NAME: ${{ steps.parse.outputs.project_name }}
+          REPO_NAME: ${{ steps.parse.outputs.repo_name }}
+          REPO_URL: ${{ steps.create.outputs.repository_url }}
+          TEMPLATE: ${{ steps.parse.outputs.template }}
+          GITHUB_ACCOUNTS: ${{ steps.parse.outputs.github_accounts }}
+        run: node scripts/actions/comment-on-issue.js
+
+      - name: Comment Failure on Issue
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_TYPE: failure
+        run: node scripts/actions/comment-on-issue.js
+
+  # ================================================================
+  # JOB: Delete repository when issue is closed or labeled "closed"
+  # ================================================================
+  delete-repository:
+    if: |
+      contains(github.event.issue.labels.*.name, 'project-request') &&
+      (
+        github.event.action == 'closed' ||
+        (github.event.action == 'labeled' && github.event.label.name == 'closed')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Extract Repository Name from Labels
+        id: extract
+        env:
+          ISSUE_LABELS: ${{ toJson(github.event.issue.labels) }}
+        run: node scripts/actions/extract-repo-name.js
+
+      - name: Build Repo Deleter Action
+        if: steps.extract.outputs.should_delete == 'true'
+        working-directory: .github/actions/repo-deleter
+        run: |
+          npm install
+          npm run build
+
+      - name: Delete Repository
+        if: steps.extract.outputs.should_delete == 'true'
+        uses: ./.github/actions/repo-deleter
+        with:
+          token: ${{ env.GH_ADMIN_TOKEN }}
+          owner: ${{ env.ORGANIZATION_NAME }}
+          repo: ${{ steps.extract.outputs.repo_name }}
+
+      - name: Comment on Issue - Deleted
+        if: steps.extract.outputs.should_delete == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_TYPE: deleted
+          REPO_NAME: ${{ steps.extract.outputs.repo_name }}
+        run: node scripts/actions/comment-on-issue.js
+
+      - name: Comment on Issue - No Repository Found
+        if: steps.extract.outputs.should_delete == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_TYPE: no-repo
+        run: node scripts/actions/comment-on-issue.js

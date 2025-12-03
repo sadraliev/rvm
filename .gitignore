@@ -4,6 +4,10 @@
 /build
 /tmp
 
+# GitHub Actions node_modules
+/.github/actions/repo-deleter/node_modules
+/.github/actions/template-based-repo-creator/node_modules
+
 # Logs
 logs
 *.log
