@@ -280,19 +280,14 @@ async function main(): Promise<void> {
   const repo = result.data.repoName;
 
   const repos = await getRepositories(owner);
-  const repoNames = repos.map((r) => r.name);
-  console.log("Repo names:", repoNames, repo);
-  const existingRepo = repos.find((r) =>
-    r.name.toLowerCase().startsWith(repo.toLowerCase())
-  );
+  const repoNames = repos.map((r) => r.name.toLowerCase());
 
-  console.log("Existing repo:", existingRepo);
-  if (existingRepo) {
-    core.setFailed(
-      `Repository with prefix "${repo}" already exists: ${existingRepo.name}`
-    );
+  if (repoNames.includes(repo.toLowerCase())) {
+    core.setFailed(`Repository ${repo} already exists`);
     return;
   }
+
+  console.log("Repo names:", repoNames, repo);
 
   // switch (action) {
   //   case "parse": {
