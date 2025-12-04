@@ -280,6 +280,8 @@ async function main(): Promise<void> {
   const repo = result.data.repoName;
 
   const repos = await getRepositories(owner);
+  const repoNames = repos.map((r) => r.name);
+  console.log("Repo names:", repoNames, repo);
   const existingRepo = repos.find((r) =>
     r.name.toLowerCase().startsWith(repo.toLowerCase())
   );
