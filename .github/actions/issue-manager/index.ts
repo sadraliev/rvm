@@ -287,8 +287,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.log("Repo names:", repoNames, repo);
-
   // switch (action) {
   //   case "parse": {
   //     // const issueTitle = core.getInput("issue_title", { required: true });
