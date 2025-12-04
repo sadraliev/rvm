@@ -235,7 +235,7 @@ export async function getRepositories(owner: string) {
   if (isOrg(ownerType)) {
     const repos = await octokit.paginate(octokit.rest.repos.listForOrg, {
       org: owner,
-      per_page: 100,
+      per_page: 1000,
     });
     return repos;
   }
@@ -265,8 +265,7 @@ async function main(): Promise<void> {
 
   const result = parseIssueForm(title, body);
   if (!result.ok) {
-    core.setFailed(result.message);
-    return;
+    throw new Error(result.message);
   }
 
   core.setOutput("projectName", result.data.projectName);
@@ -276,24 +275,19 @@ async function main(): Promise<void> {
   core.setOutput("description", result.data.description);
   core.setOutput("isPrivate", result.data.isPrivate);
 
-  console.log("Parsed data:", result.data);
-  const octokit = getOctokit(token);
-
   const owner = context.repo.owner;
   const repo = result.data.repoName;
   console.log("Owner:", owner);
   console.log("Repo:", repo);
 
   const repos = await getRepositories(owner);
-  console.log("Repositories:", repos);
+  const existingRepo = repos.find((r) =>
+    r.name.toLowerCase().startsWith(repo.toLowerCase())
+  );
 
-  // const existingRepo = repos.find((r) => r.name.toLowerCase() === repo.toLowerCase());
-
-  // const exists = await checkRepoExists(octokit, owner, repo);
-  // core.setOutput("exists", exists ? "true" : "false");
-  // if (!parsed.ok) {
-  //   throw new Error(parsed.data.message);
-  // }
+  if (existingRepo) {
+    throw new Error(`Repository ${repo} already exists`);
+  }
 
   // switch (action) {
   //   case "parse": {
