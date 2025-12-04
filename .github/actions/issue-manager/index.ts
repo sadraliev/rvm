@@ -255,7 +255,7 @@ export async function getRepositories(owner: string) {
 async function main(): Promise<void> {
   const token = process.env.GH_TOKEN!;
   if (!token) {
-    console.error("GH_TOKEN is not set");
+    console.error("GH_TOKEN is not set", process.env);
     core.setFailed("GH_TOKEN is not set");
     return;
   }
