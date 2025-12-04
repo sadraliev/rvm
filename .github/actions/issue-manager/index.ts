@@ -278,14 +278,13 @@ async function main(): Promise<void> {
 
   const owner = context.repo.owner;
   const repo = result.data.repoName;
-  console.log("Owner:", owner);
-  console.log("Repo:", repo);
 
   const repos = await getRepositories(owner);
   const existingRepo = repos.find((r) =>
     r.name.toLowerCase().startsWith(repo.toLowerCase())
   );
 
+  console.log("Existing repo:", existingRepo);
   if (existingRepo) {
     core.setFailed(
       `Repository with prefix "${repo}" already exists: ${existingRepo.name}`
