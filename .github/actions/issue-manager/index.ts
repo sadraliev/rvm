@@ -210,30 +210,55 @@ function validateRepoName(repoName: string): string[] {
   return errors;
 }
 
-// ============================================
-// Check Repository Exists
-// ============================================
+async function isOrgOrUser(owner: string): Promise<"User" | "Organization"> {
+  const octokit = getOctokit(process.env.GH_TOKEN!);
+  const { data } = await octokit.rest.users.getByUsername({
+    username: owner,
+  });
 
-async function checkRepoExists(
-  octokit: ReturnType<typeof getOctokit>,
-  owner: string,
-  repo: string
-): Promise<boolean> {
-  try {
-    await octokit.rest.repos.get({ owner, repo });
-    console.log(`⚠️ Repository ${owner}/${repo} already exists`);
-    return true;
-  } catch (error: any) {
-    if (error?.status === 404) {
-      console.log(`✅ Repository ${owner}/${repo} does not exist`);
-      return false;
-    }
-    throw error;
+  return data.type as "User" | "Organization";
+}
+
+function isUser(ownerType: "User" | "Organization"): boolean {
+  return ownerType === "User";
+}
+
+function isOrg(ownerType: "User" | "Organization"): boolean {
+  return ownerType === "Organization";
+}
+
+export async function getRepositories(owner: string) {
+  const octokit = getOctokit(process.env.GH_TOKEN!);
+
+  const ownerType = await isOrgOrUser(owner);
+
+  if (isOrg(ownerType)) {
+    const repos = await octokit.paginate(octokit.rest.repos.listForOrg, {
+      org: owner,
+      per_page: 100,
+    });
+    return repos;
   }
+
+  if (isUser(ownerType)) {
+    const repos = await octokit.paginate(octokit.rest.repos.listForUser, {
+      username: owner,
+      per_page: 100,
+    });
+
+    return repos;
+  }
+
+  return [];
 }
 
 async function main(): Promise<void> {
-  const token = core.getInput("token", { required: true });
+  const token = process.env.GH_TOKEN!;
+  if (!token) {
+    console.error("GH_TOKEN is not set");
+    core.setFailed("GH_TOKEN is not set");
+    return;
+  }
   const issue = context.payload.issue;
   const body = issue?.body || "";
   const title = issue?.title || "";
@@ -250,7 +275,22 @@ async function main(): Promise<void> {
   core.setOutput("githubAccounts", JSON.stringify(result.data.githubAccounts));
   core.setOutput("description", result.data.description);
   core.setOutput("isPrivate", result.data.isPrivate);
+
+  console.log("Parsed data:", result.data);
   const octokit = getOctokit(token);
+
+  const owner = context.repo.owner;
+  const repo = result.data.repoName;
+  console.log("Owner:", owner);
+  console.log("Repo:", repo);
+
+  const repos = await getRepositories(owner);
+  console.log("Repositories:", repos);
+
+  // const existingRepo = repos.find((r) => r.name.toLowerCase() === repo.toLowerCase());
+
+  // const exists = await checkRepoExists(octokit, owner, repo);
+  // core.setOutput("exists", exists ? "true" : "false");
   // if (!parsed.ok) {
   //   throw new Error(parsed.data.message);
   // }
