@@ -122,22 +122,67 @@ function sanitizeRepoName(projectName: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function parseIssueForm(issueTitle: string, issueBody: string) {
+type ParseIssueFormResult =
+  | {
+      ok: true;
+      status: string;
+      message: string;
+      data: {
+        projectName: string;
+        repoName: string;
+        template: string;
+        githubAccounts: string[];
+        description: string;
+        isPrivate: boolean;
+      };
+    }
+  | {
+      ok: false;
+      status: string;
+      message: string;
+    };
+
+function parseIssueForm(
+  issueTitle: string,
+  issueBody: string
+): ParseIssueFormResult {
   const projectName = extractProjectName(issueTitle);
-  const template = parseFormField(issueBody, "Template Repository");
-  const githubAccountsRaw = parseFormField(issueBody, "GitHub Accounts");
-  const description = parseFormField(issueBody, "Project Description");
-  const isPrivate = issueBody.includes("[X] Make this repository private");
-  const githubAccounts = parseGitHubAccounts(githubAccountsRaw);
   const repoName = sanitizeRepoName(projectName);
 
+  if (!repoName) {
+    return {
+      ok: false,
+      status: "project_name_required",
+      message: "Project name is required",
+    };
+  }
+
+  if (projectName.length > 100) {
+    return {
+      ok: false,
+      status: "project_name_too_long",
+      message: "Project name is too long (max 100 characters)",
+    };
+  }
+
+  const template = parseFormField(issueBody, "Template Repository");
+  const description = parseFormField(issueBody, "Project Description");
+  const isPrivate = issueBody.includes("[X] Make this repository private");
+  const githubAccountsRaw = parseFormField(issueBody, "GitHub Accounts");
+  const githubAccounts = parseGitHubAccounts(githubAccountsRaw);
+
   return {
-    projectName,
-    repoName,
-    template: template || "nestjs-template",
-    githubAccounts,
-    description: description || "",
-    isPrivate,
+    ok: true,
+    status: "success",
+    message: "Issue form parsed successfully",
+    data: {
+      projectName,
+      repoName,
+      template: template || "nestjs-template",
+      githubAccounts,
+      description: description || "",
+      isPrivate,
+    },
   };
 }
 
@@ -187,88 +232,105 @@ async function checkRepoExists(
   }
 }
 
-// ============================================
-// Main
-// ============================================
-
 async function main(): Promise<void> {
-  const token = core.getInput("token", { required: true });
-  const action = core.getInput("action", { required: true });
+  const token = process.env.GH_TOKEN;
+  if (!token) {
+    throw new Error("GH_TOKEN is missing");
+  }
 
   const octokit = getOctokit(token);
+  const issue = context.payload.issue;
+  const body = issue?.body || "";
+  const title = issue?.title || "";
 
-  switch (action) {
-    case "parse": {
-      const issueTitle = core.getInput("issue_title", { required: true });
-      const issueBody = core.getInput("issue_body", { required: true });
-
-      const parsed = parseIssueForm(issueTitle, issueBody);
-
-      console.log("Parsed data:");
-      console.log("- Project Name:", parsed.projectName);
-      console.log("- Repo Name:", parsed.repoName);
-      console.log("- Template:", parsed.template);
-      console.log("- Collaborators:", parsed.githubAccounts);
-      console.log("- Private:", parsed.isPrivate);
-
-      core.setOutput("project_name", parsed.projectName);
-      core.setOutput("repo_name", parsed.repoName);
-      core.setOutput("template", parsed.template);
-      core.setOutput("collaborators", JSON.stringify(parsed.githubAccounts));
-      core.setOutput("description", parsed.description);
-      core.setOutput("is_private", String(parsed.isPrivate));
-
-      // Also validate
-      const errors = validateRepoName(parsed.repoName);
-      if (errors.length > 0) {
-        core.setOutput("valid", "false");
-        core.setOutput("errors", errors.join(", "));
-        console.log("❌ Validation errors:", errors.join(", "));
-      } else {
-        core.setOutput("valid", "true");
-        core.setOutput("errors", "");
-        console.log("✅ Validation passed");
-      }
-      break;
-    }
-
-    case "check-repo": {
-      const owner = core.getInput("owner", { required: true });
-      const repoName = core.getInput("repo_name", { required: true });
-
-      const exists = await checkRepoExists(octokit, owner, repoName);
-      core.setOutput("exists", exists ? "true" : "false");
-      break;
-    }
-
-    case "comment": {
-      const issueNumber = parseInt(
-        core.getInput("issue_number", { required: true })
-      );
-      const commentType = core.getInput("comment_type") as CommentType;
-      const repoName = core.getInput("repo_name") || "";
-      const repoUrl = core.getInput("repo_url") || "";
-      const template = core.getInput("template") || "";
-      let collaborators: string[] = [];
-
-      try {
-        collaborators = JSON.parse(core.getInput("collaborators") || "[]");
-      } catch {
-        collaborators = [];
-      }
-
-      await postComment(octokit, issueNumber, commentType, {
-        repoName,
-        repoUrl,
-        template,
-        collaborators,
-      });
-      break;
-    }
-
-    default:
-      core.setFailed(`Unknown action: ${action}`);
+  const result = parseIssueForm(title, body);
+  if (!result.ok) {
+    core.setFailed(result.message);
+    return;
   }
+
+  core.setOutput("projectName", result.data.projectName);
+  core.setOutput("repoName", result.data.repoName);
+  core.setOutput("templateRepo", result.data.template);
+  core.setOutput("githubAccounts", JSON.stringify(result.data.githubAccounts));
+  core.setOutput("description", result.data.description);
+  core.setOutput("isPrivate", result.data.isPrivate);
+  // if (!parsed.ok) {
+  //   throw new Error(parsed.data.message);
+  // }
+
+  // switch (action) {
+  //   case "parse": {
+  //     // const issueTitle = core.getInput("issue_title", { required: true });
+  //     // const issueBody = core.getInput("issue_body", { required: true });
+
+  //     const parsed = parseIssueForm(issueTitle, issueBody);
+
+  //     console.log("Parsed data:");
+  //     console.log("- Project Name:", parsed.projectName);
+  //     console.log("- Repo Name:", parsed.repoName);
+  //     console.log("- Template:", parsed.template);
+  //     console.log("- Collaborators:", parsed.githubAccounts);
+  //     console.log("- Private:", parsed.isPrivate);
+
+  //     core.setOutput("project_name", parsed.projectName);
+  //     core.setOutput("repo_name", parsed.repoName);
+  //     core.setOutput("template", parsed.template);
+  //     core.setOutput("collaborators", JSON.stringify(parsed.githubAccounts));
+  //     core.setOutput("description", parsed.description);
+  //     core.setOutput("is_private", String(parsed.isPrivate));
+
+  //     // Also validate
+  //     const errors = validateRepoName(parsed.repoName);
+  //     if (errors.length > 0) {
+  //       core.setOutput("valid", "false");
+  //       core.setOutput("errors", errors.join(", "));
+  //       console.log("❌ Validation errors:", errors.join(", "));
+  //     } else {
+  //       core.setOutput("valid", "true");
+  //       core.setOutput("errors", "");
+  //       console.log("✅ Validation passed");
+  //     }
+  //     break;
+  //   }
+
+  //   case "check-repo": {
+  //     const owner = core.getInput("owner", { required: true });
+  //     const repoName = core.getInput("repo_name", { required: true });
+
+  //     const exists = await checkRepoExists(octokit, owner, repoName);
+  //     core.setOutput("exists", exists ? "true" : "false");
+  //     break;
+  //   }
+
+  //   case "comment": {
+  //     const issueNumber = parseInt(
+  //       core.getInput("issue_number", { required: true })
+  //     );
+  //     const commentType = core.getInput("comment_type") as CommentType;
+  //     const repoName = core.getInput("repo_name") || "";
+  //     const repoUrl = core.getInput("repo_url") || "";
+  //     const template = core.getInput("template") || "";
+  //     let collaborators: string[] = [];
+
+  //     try {
+  //       collaborators = JSON.parse(core.getInput("collaborators") || "[]");
+  //     } catch {
+  //       collaborators = [];
+  //     }
+
+  //     await postComment(octokit, issueNumber, commentType, {
+  //       repoName,
+  //       repoUrl,
+  //       template,
+  //       collaborators,
+  //     });
+  //     break;
+  //   }
+
+  //   default:
+  //     core.setFailed(`Unknown action: ${action}`);
+  // }
 }
 
 main().catch((error) => {

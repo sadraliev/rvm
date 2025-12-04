@@ -19,14 +19,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build Issue Manager
+        working-directory: .github/actions/issue-manager
+        run: |
+          npm install
+          npm run build
+
       - name: Parse and Validate Issue
         id: parse
         uses: ./.github/actions/issue-manager
         with:
           token: ${{ env.GH_ADMIN_TOKEN }}
           action: parse
-          issue_title: ${{ github.event.issue.title }}
-          issue_body: ${{ github.event.issue.body }}
 
       - name: Fail if Invalid
         if: steps.parse.outputs.valid == 'false'
@@ -34,64 +43,58 @@ jobs:
           echo "❌ Validation failed: ${{ steps.parse.outputs.errors }}"
           exit 1
 
-      - name: Check if Repository Exists
-        id: check
-        uses: ./.github/actions/issue-manager
-        with:
-          token: ${{ env.GH_ADMIN_TOKEN }}
-          action: check-repo
-          owner: ${{ env.ORGANIZATION_NAME }}
-          repo_name: ${{ steps.parse.outputs.repo_name }}
+      # - name: Check if Repository Exists
+      #   id: check
+      #   uses: ./.github/actions/issue-manager
+      #   with:
+      #     token: ${{ env.GH_ADMIN_TOKEN }}
+      #     action: check-repo
+      #     owner: ${{ env.ORGANIZATION_NAME }}
+      #     repo_name: ${{ steps.parse.outputs.repo_name }}
 
-      - name: Create Repository from Template
-        if: steps.check.outputs.exists == 'false'
-        id: create
-        uses: ./.github/actions/template-based-repo-creator
-        with:
-          token: ${{ env.GH_ADMIN_TOKEN }}
-          template_owner: ${{ env.ORGANIZATION_NAME }}
-          template_repo: ${{ steps.parse.outputs.template }}
-          new_repo_owner: ${{ env.ORGANIZATION_NAME }}
-          new_repo_name: ${{ steps.parse.outputs.repo_name }}
-          private: ${{ steps.parse.outputs.is_private }}
-          protect_default_branch: true
+      # - name: Create Repository from Template
+      #   if: steps.check.outputs.exists == 'false'
+      #   id: create
+      #   uses: ./.github/actions/template-based-repo-creator
+      #   with:
+      #     token: ${{ env.GH_ADMIN_TOKEN }}
+      #     template_owner: ${{ env.ORGANIZATION_NAME }}
+      #     template_repo: ${{ steps.parse.outputs.template }}
+      #     new_repo_owner: ${{ env.ORGANIZATION_NAME }}
+      #     new_repo_name: ${{ steps.parse.outputs.repo_name }}
+      #     private: ${{ steps.parse.outputs.is_private }}
+      #     protect_default_branch: true
 
-      - name: Setup Node.js
-        if: steps.check.outputs.exists == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      # - name: Add Collaborators
+      #   if: steps.check.outputs.exists == 'false'
+      #   env:
+      #     GITHUB_TOKEN: ${{ env.GH_ADMIN_TOKEN }}
+      #     REPO_OWNER: ${{ env.ORGANIZATION_NAME }}
+      #     REPO_NAME: ${{ steps.parse.outputs.repo_name }}
+      #     GITHUB_ACCOUNTS: ${{ steps.parse.outputs.collaborators }}
+      #   run: node scripts/actions/add-collaborators.js
 
-      - name: Add Collaborators
-        if: steps.check.outputs.exists == 'false'
-        env:
-          GITHUB_TOKEN: ${{ env.GH_ADMIN_TOKEN }}
-          REPO_OWNER: ${{ env.ORGANIZATION_NAME }}
-          REPO_NAME: ${{ steps.parse.outputs.repo_name }}
-          GITHUB_ACCOUNTS: ${{ steps.parse.outputs.collaborators }}
-        run: node scripts/actions/add-collaborators.js
+      # - name: Comment Success
+      #   if: steps.check.outputs.exists == 'false'
+      #   uses: ./.github/actions/issue-manager
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     action: comment
+      #     issue_number: ${{ github.event.issue.number }}
+      #     comment_type: success
+      #     repo_name: ${{ steps.parse.outputs.repo_name }}
+      #     repo_url: ${{ steps.create.outputs.repository_url }}
+      #     template: ${{ steps.parse.outputs.template }}
+      #     collaborators: ${{ steps.parse.outputs.collaborators }}
 
-      - name: Comment Success
-        if: steps.check.outputs.exists == 'false'
-        uses: ./.github/actions/issue-manager
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          action: comment
-          issue_number: ${{ github.event.issue.number }}
-          comment_type: success
-          repo_name: ${{ steps.parse.outputs.repo_name }}
-          repo_url: ${{ steps.create.outputs.repository_url }}
-          template: ${{ steps.parse.outputs.template }}
-          collaborators: ${{ steps.parse.outputs.collaborators }}
-
-      - name: Comment Failure
-        if: steps.check.outputs.exists == 'false' && failure()
-        uses: ./.github/actions/issue-manager
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          action: comment
-          issue_number: ${{ github.event.issue.number }}
-          comment_type: failure
+      # - name: Comment Failure
+      #   if: steps.check.outputs.exists == 'false' && failure()
+      #   uses: ./.github/actions/issue-manager
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     action: comment
+      #     issue_number: ${{ github.event.issue.number }}
+      #     comment_type: failure
 
   # ===========================================
   # JOB: Delete repository when issue is closed

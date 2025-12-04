@@ -1,13 +1,8 @@
-# Nestjs specific
-/dist
+/.github/actions/**/*/node_modules
+/.github/actions/**/*/dist
 /node_modules
 /build
 /tmp
-
-# GitHub Actions node_modules
-/.github/actions/repo-deleter/node_modules
-/.github/actions/template-based-repo-creator/node_modules
-/.github/actions/issue-manager/node_modules
 
 # Logs
 logs
