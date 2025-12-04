@@ -233,12 +233,7 @@ async function checkRepoExists(
 }
 
 async function main(): Promise<void> {
-  const token = process.env.GH_TOKEN;
-  if (!token) {
-    throw new Error("GH_TOKEN is missing");
-  }
-
-  const octokit = getOctokit(token);
+  const token = core.getInput("token", { required: true });
   const issue = context.payload.issue;
   const body = issue?.body || "";
   const title = issue?.title || "";
@@ -255,6 +250,7 @@ async function main(): Promise<void> {
   core.setOutput("githubAccounts", JSON.stringify(result.data.githubAccounts));
   core.setOutput("description", result.data.description);
   core.setOutput("isPrivate", result.data.isPrivate);
+  const octokit = getOctokit(token);
   // if (!parsed.ok) {
   //   throw new Error(parsed.data.message);
   // }

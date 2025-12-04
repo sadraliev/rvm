@@ -35,7 +35,6 @@ jobs:
         uses: ./.github/actions/issue-manager
         with:
           token: ${{ env.GH_ADMIN_TOKEN }}
-          action: parse
 
       - name: Fail if Invalid
         if: steps.parse.outputs.valid == 'false'
