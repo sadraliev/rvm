@@ -2,7 +2,7 @@ name: Repository Lifecycle Manager
 
 on:
   issues:
-    types: [opened, closed]
+    types: [opened, deleted]
 
 env:
   GH_ADMIN_TOKEN: ${{ secrets.GH_ADMIN_TOKEN }}
@@ -99,7 +99,7 @@ jobs:
   # JOB: Delete repository when issue is closed
   # ===========================================
   delete-repository:
-    if: github.event.action == 'closed'
+    if: github.event.action == 'deleted'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
