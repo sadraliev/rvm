@@ -265,8 +265,8 @@ async function main(): Promise<void> {
 
   const result = parseIssueForm(title, body);
   if (!result.ok) {
-    console.error("Failed to parse issue form:", result.message);
-    throw new Error(result.message);
+    core.setFailed(result.message);
+    return;
   }
 
   core.setOutput("projectName", result.data.projectName);
@@ -287,8 +287,10 @@ async function main(): Promise<void> {
   );
 
   if (existingRepo) {
-    console.error(`Repository ${repo} already exists: ${existingRepo.name}`);
-    throw new Error(`Repository ${repo} already exists`);
+    core.setFailed(
+      `Repository with prefix "${repo}" already exists: ${existingRepo.name}`
+    );
+    return;
   }
 
   // switch (action) {
