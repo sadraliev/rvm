@@ -265,6 +265,7 @@ async function main(): Promise<void> {
 
   const result = parseIssueForm(title, body);
   if (!result.ok) {
+    console.error("Failed to parse issue form:", result.message);
     throw new Error(result.message);
   }
 
@@ -286,6 +287,7 @@ async function main(): Promise<void> {
   );
 
   if (existingRepo) {
+    console.error(`Repository ${repo} already exists: ${existingRepo.name}`);
     throw new Error(`Repository ${repo} already exists`);
   }
 
