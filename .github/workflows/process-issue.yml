@@ -33,8 +33,8 @@ jobs:
       - name: Parse and Validate Issue
         id: parse
         uses: ./.github/actions/issue-manager
-        with:
-          token: ${{ env.GH_ADMIN_TOKEN }}
+        env:
+          GH_TOKEN: ${{ env.GH_ADMIN_TOKEN }}
 
       - name: Fail if Invalid
         if: steps.parse.outputs.valid == 'false'
