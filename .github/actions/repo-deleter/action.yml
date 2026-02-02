@@ -1,0 +1,21 @@
+name: "Delete Repository"
+description: "Deletes a GitHub repository"
+author: "RVM"
+inputs:
+  token:
+    description: "GitHub token with repo deletion rights"
+    required: true
+  owner:
+    required: true
+    description: "Owner of the repository to delete"
+  repo:
+    required: true
+    description: "Name of the repository to delete"
+
+outputs:
+  deleted:
+    description: "Whether the repository was deleted successfully"
+
+runs:
+  using: "node20"
+  main: "dist/index.cjs"
